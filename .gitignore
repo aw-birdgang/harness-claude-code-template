@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build / cache
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+.cache/
+
+# Env & secrets
+.env
+.env.*.local
+
+# OS / IDE
+.DS_Store
+.idea/
+
+# Logs & coverage
+*.log
+coverage/
+.nyc_output/
+
+# Misc
+*.local

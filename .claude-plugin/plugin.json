@@ -1,0 +1,10 @@
+{
+  "name": "harness-claude-code-template",
+  "version": "0.1.0",
+  "description": "Condensed harness template — agents, skills, commands, rules; Node tooling",
+  "license": "MIT",
+  "keywords": ["claude-code", "harness", "template"],
+  "mcpServers": {},
+  "skills": ["./skills/"],
+  "commands": ["./commands/"]
+}

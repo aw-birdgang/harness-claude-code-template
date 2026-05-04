@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "defaultProfile": "minimal",
+  "profiles": {
+    "minimal": {
+      "description": "Rules, agents, commands only — no hook runtime (전략 §2.1 단일 하네스·저컨텍스트)",
+      "modules": ["rules-core", "agents-core", "commands-core"]
+    },
+    "core": {
+      "description": "minimal + hooks-runtime (추가 시 hooks/ 스크립트 정비 후 모듈 활성화)",
+      "modules": ["rules-core", "agents-core", "commands-core", "hooks-runtime"]
+    }
+  }
+}

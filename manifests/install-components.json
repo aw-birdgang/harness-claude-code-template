@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "id": "baseline:rules",
+      "family": "baseline",
+      "description": "Shared rules",
+      "modules": ["rules-core"]
+    },
+    {
+      "id": "baseline:agents",
+      "family": "baseline",
+      "description": "Agents + AGENTS.md",
+      "modules": ["agents-core"]
+    },
+    {
+      "id": "baseline:commands",
+      "family": "baseline",
+      "description": "Commands",
+      "modules": ["commands-core"]
+    },
+    {
+      "id": "baseline:hooks",
+      "family": "baseline",
+      "description": "Hook runtime (optional profile core)",
+      "modules": ["hooks-runtime"]
+    }
+  ]
+}

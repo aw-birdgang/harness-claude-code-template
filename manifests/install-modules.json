@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "rules-core",
+      "kind": "rules",
+      "description": "common + TypeScript rules (팀 스택에 맞게 조정)",
+      "paths": ["rules"],
+      "targets": ["claude", "cursor"],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
+      "id": "agents-core",
+      "kind": "agents",
+      "description": "Agent markdown + AGENTS.md",
+      "paths": ["agents", "AGENTS.md"],
+      "targets": ["claude", "cursor", "codex"],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
+      "id": "commands-core",
+      "kind": "commands",
+      "description": "Slash command docs",
+      "paths": ["commands"],
+      "targets": ["claude", "cursor", "opencode"],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "hooks-runtime",
+      "kind": "hooks",
+      "description": "hooks.json + scripts/hooks + scripts/lib",
+      "paths": ["hooks", "scripts/hooks", "scripts/lib"],
+      "targets": ["claude", "cursor"],
+      "dependencies": [],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "stable"
+    }
+  ]
+}

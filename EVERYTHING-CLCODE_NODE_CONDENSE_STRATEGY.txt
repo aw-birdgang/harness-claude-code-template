@@ -1,0 +1,244 @@
+================================================================================
+everything-claude-code → Node 기반 “동형 축소” 재작성 전략
+(harness-claude-code-template 사본)
+────────────────────────────────────────────────────────────────────────────────
+  원본과 동기화: 워크스페이스 루트 …/harness/EVERYTHING-CLCODE_NODE_CONDENSE_STRATEGY.txt
+  이 파일 위치: harness-claude-code-template/EVERYTHING-CLCODE_NODE_CONDENSE_STRATEGY.txt
+  배치일: 2026-05-04
+  용도: 이 템플릿 저장소를 ECC 축소·Node 단일 런타임 방향으로 맞출 때의 참고 전략
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+■ 템플릿 저장소 진행 이력 (이 문서에 누적 표시)
+────────────────────────────────────────────────────────────────────────────────
+  [완료 · 2026-05-04] Phase 0 범위 고정: 단일 하네스(Claude Code 플러그인 형태) +
+        Node 20+ 전제, “minimal / core” 프로파일만 manifests에 정의.
+  [완료 · 2026-05-04] §3.1 권장 단일 소스 트리 1차 구현:
+        agents/, skills/harness-workflow/, commands/, rules/common + rules/typescript/,
+        hooks/hooks.json(빈 hooks), scripts/{ecc.js,install-plan-stub.js,lib/utils.js,ci/},
+        manifests/* 3종, .claude-plugin/plugin.json, mcp-configs/mcp-servers.json,
+        schemas/, tests/run-all.js, package.json, AGENTS.md, CLAUDE.md, README.md
+  [완료 · 2026-05-04] §2.7 Phase A 검증: scripts/ci/validate-skeleton.js + npm test
+  [ ] Phase 1 인벤토리: ECC 대비 이 템플릿에 복사할 모듈 ID 확정(팀 합의)
+  [ ] Phase 2 install-apply / doctor / uninstall — ECC 스크립트 이식 또는 축소 구현
+  [ ] build-harness.js — .cursor/.codex 등은 생성만(§3.2) 필요 시 추가
+  [ ] 훅 스크립트 실장 시 profiles.core에서 hooks-runtime 채우기
+
+────────────────────────────────────────────────────────────────────────────────
+1. 목적과 전제
+────────────────────────────────────────────────────────────────────────────────
+
+1.1 목적
+  - everything-claude-code(ECC)는 “Claude Code 플러그인 + 멀티 하네스 동기화 +
+    선택 설치(manifest) + 대규모 스킬/에이전트 카탈로그”로 성장한 저장소다.
+  - 동일한 **논리 구조**(agents / skills / commands / rules / hooks / scripts /
+    manifests / 검증 CI)를 유지하면서, **노드 단일 런타임**으로 운영 가능한
+    **작은 포크·템플릿·내부 배포물**을 만들려면 “무엇을 버리고, 무엇을 합치고,
+    무엇을 생성기로 대체할지”를 먼저 정해야 한다.
+
+1.2 이미 Node인 부분 (오해 방지)
+  - 훅 구현, 설치/수리/닥터, catalog, consult, sqlite 세션 유틸 등 **핵심
+    자동화는 이미 Node.js**다. (package.json engines: node >= 18)
+  - “Node로 재작성”의 대상은 **스크립트 언어 전환**이라기보다, (1) **콘텐츠
+    대량 감축·모듈화**, (2) **멀티 IDE 폴더(.cursor/.codex/.opencode/…) 중복 제거
+    또는 빌드 산출물화**, (3) **비필수 서브시스템 분리(ecc2 Rust, Python 대시보드)**가
+    중심이 된다.
+
+1.3 현황 스냅샷 (대략 파일 수, node_modules 제외)
+  - agents/          약 48
+  - commands/        약 68
+  - skills/          약 287 (SKILL.md 및 부속 파일 포함)
+  - rules/           약 89
+  - hooks/           구성 파일은 소수(예: hooks.json 중심)이나 hooks 본체는
+                     scripts/hooks/ 등으로 분산 → scripts/ 전체 약 143
+  - tests/           약 117
+  - contexts/        약 3
+  - examples/        약 9
+  - mcp-configs/     약 1 (집약 파일)
+  - manifests/       3 (install-profiles / install-modules / install-components)
+  - schemas/         약 10
+  - legacy-command-shims/ 약 13
+  - docs/            약 763 (다국어·가이드·릴리즈 노트 포함 → 축소 1순위 후보)
+  - ecc2/            약 19 (Rust 알파 제어 플레인 — 템플릿에 필수 아님)
+  - .cursor / .codex / .opencode 등 하네스별 복제 표면: 수십~수백 파일
+
+  → **콘텐츠(skills+commands+docs)와 크로스 하네스 복제본이 용량·유지보수의 대부분**이다.
+
+
+────────────────────────────────────────────────────────────────────────────────
+2. ECC 구조를 유지한 채 “축소”할 축(축약 축)
+────────────────────────────────────────────────────────────────────────────────
+
+아래 축을 조합해 목표 규모를 정한다. (예: “Claude Code만 + TypeScript 스택 +
+minimal 프로파일”)
+
+2.1 하네스 범위 축소 (가장 큰 절감)
+  - **타깃 1종만 소스에 유지**: 예) Claude Code만, 또는 Claude + Cursor만.
+  - 나머지(.codex, .opencode, .gemini, .kiro, .codebuddy 등)는
+    - (권장) **빌드 스텝에서 생성**: “소스는 단일 canonical 트리 → 어댑터로 전개”
+    - 또는 **별 패키지**로 분리해 optional peer로 두어 npm package 크기에서 제외
+
+2.2 설치 프로파일에 맞춘 ‘단일 진실’ (manifests/)
+  - ECC는 이미 install-profiles.json → modules → components 계층을 갖는다.
+  - 축소판에서는:
+    - **한 개의 기본 프로파일만** 소스에 포함 (예: `minimal` 또는 팀 표준 `developer`)
+    - `full` 및 희귀 모듈(예: operator/social/research 전부)은 **제거하거나
+      별도 확장 팩**으로 분리
+  - package.json `files` 필드도 축소 배포에 맞게 슬림화 (ECC 본전은 수백 개의
+    skills 경로를 명시하는 방식 — 축소판에서는 불필요한 나열 제거)
+
+2.3 스킬·커맨드·에이전트의 ‘역할 합치기’
+  - **에이전트 수평 확장**: language별 reviewer·build-resolver가 분리되어 있다.
+    축소 시:
+    - “리뷰어 1명 + SKILL에 언어별 체크리스트 링크” 패턴으로 **에이전트 수 감소**
+    - 또는 단일 `code-reviewer` + 부속 `skills/<lang>-patterns`만 유지
+  - **commands vs skills 중복**: ECC는 skills 우선 정책 + commands는 호환 셈.
+    축소판에서는:
+    - **신규 워크플로는 skills만**; commands 디렉터리는 점진 삭제 또는 자동 생성
+    - legacy-command-shims는 **아예 미포함** (필요 시 문서로만 안내)
+  - **.agents/skills vs skills/** 이중화: Codex 등용 번들과 전체 스킬이 공존한다.
+    단일 하네스 타깃이면 **한 디렉터리만 canonical**로 두고 나머지는 빌드 산출물로만 유지
+
+2.4 규칙(rules/) 스택 다이어트
+  - `rules/common`은 대체로 유지 가치가 높다.
+  - 언어별 디렉터리는 **실제 제품 스택에 맞게 1~2개만** (예: typescript + python).
+  - 나머지는 “커뮤니티 확장” 패키지로 분리하거나 스킬 내부 문서로 흡수
+
+2.5 훅(hooks) 프로파일
+  - README에 나오듯 `ECC_HOOK_PROFILE`, `ECC_DISABLED_HOOKS`로 런타임 게이트 가능.
+  - 축소 재작성 시:
+    - **minimal 프로파일**: SessionStart/핵심 몇 개만 — 스크립트와 설정 단순화
+    - 정적 분석·게이트가 많은 엔터프라이즈 훅 전부 유지는 **유지보수 비용↑**
+  - Cursor 어댑터 등 **이중 이벤트 매핑**은 Claude-only 템플릿에서는 제거 가능
+
+2.6 스크립트(ecc CLI) 역할 축소
+  - 현재 ecc.js는 install/plan/catalog/consult/doctor/repair/sessions 등 광범위하다.
+  - 최소 템플릿에 필요한 것만 남기는 예:
+    - `plan` + `install` + `doctor` + `uninstall` (+ 선택 `consult`)
+  - 세션 SQLite·오케스트레이션·codex 머지 등 **팀이 쓰지 않으면 submodule 또는
+    별 패키지**로 분리
+
+2.7 CI/검증(scripts/ci/) 슬림화
+  - ECC는 validate-agents/commands/rules/skills/hooks/install-manifests +
+    catalog check + unicode 등 **다단 검증**이다.
+  - 축소판 단계:
+    - Phase A: **스키마/필수 필드만** (예: agents/commands 스키마)
+    - Phase B: 점진적으로 skill 규칙·퍼스널 경로 금지 등 추가
+  - 목표는 **로컬 `npm test` 10~60초 이내** 같은 실행 가능한 빠른 루프
+
+2.8 문서(docs/)와 에셋
+  - docs/ 수백 파일은 **저장소를 압박**한다. 전략:
+    - 제품용 축소 레포에는 **README + CONTRIBUTING + 짧은 ARCHITECTURE**만
+    - 긴 가이드·다국어 번역은 **웹 사이트 또는 별 문서 저장소**로 이동
+  - assets/ 이미지는 배포에 필요한 최소만
+
+2.9 ecc2(Rust)·Python 대시보드
+  - 제어 플레인 알파(ecc2)·Tkinter 대시보드는 **핵심 플러그인 기능과 독립**이다.
+  - Node-only 재작성 목표라면 **제외**하거나 `ecc-dashboard` 같은 별 npm 패키지로 분리
+
+
+────────────────────────────────────────────────────────────────────────────────
+3. 권장 타깃 아키텍처 (축소 후 ‘비슷한 구조’)
+────────────────────────────────────────────────────────────────────────────────
+
+3.1 단일 소스 트리 (예시)
+  repo/
+    agents/              # 소수 통합 에이전트 + 프로젝트용 1~2개
+    skills/              # SKILL.md만 canonical
+    commands/            # 선택: 스킬로 흡수 후 비우거나 자동 생성
+    rules/
+      common/
+      <one-stack>/       # 예: typescript 또는 nestjs+next
+    hooks/
+      hooks.json         # 슬림 매처 + NODE 스크립트 경로
+    scripts/
+      hooks/             # 실제 훅 로직
+      lib/
+      ecc.js             # 축소된 CLI 진입점
+    manifests/
+      install-profiles.json
+      install-modules.json
+      install-components.json  # 팀이 소유하는 컴포넌트 ID만
+    schemas/             # 검증에 쓰는 JSON Schema만 유지
+    tests/
+    .claude-plugin/      # Claude 플러그인 메타 (단일 하네스만 쓸 때)
+    package.json
+
+3.2 멀티 하네스가 필요할 때
+  - 소스는 위 한 벌만 두고, **빌드**
+    `node scripts/build-harness.js --target cursor|codex|opencode`
+    가 `.cursor/`, `.codex/` 등을 **생성**하게 한다.
+  - Git에는 생성물을 커밋하지 않거나, 릴리즈 태그에서만 커밋
+
+3.3 데이터 주도 카탈로그
+  - skills/agents 목록을 수작업 복제하지 말고, **한 번 스캔해 README 표·
+    catalog.json 생성**(ECC의 catalog:sync 패턴 축소판)
+
+
+────────────────────────────────────────────────────────────────────────────────
+4. 단계별 실행 로드맵
+────────────────────────────────────────────────────────────────────────────────
+
+Phase 0 — 범위 고정 (반나절~1일)
+  - 타깃 하네스: Claude만 / Claude+Cursor 등
+  - 스택: 예) Node 20 + TypeScript + (선택) Python
+  - 비목표: ecc2, 다국어 문서, 전 프레임워크 스킬
+
+Phase 1 — 인벤토리 & 매핑 (1~3일)
+  - ECC에서 복사할 **모듈 ID 목록**을 manifests 기준으로 확정
+  - 스킬·에이전트·커맨드의 **중복 쌍** 목록 작성 (.agents vs skills, command vs skill)
+
+Phase 2 — 슬림 소스 트리 (3~10일)
+  - 프로파일 1개로 설치 가능한 최소 집합만 남기고 scripts/install-*.js 경로 정리
+  - 훅: dispatcher 중심으로 유지할 matcher만 남기고 나머지 제거
+
+Phase 3 — 검증·테스트 정렬 (2~5일)
+  - scripts/ci 축소본 작성 후 `npm test` 통과 기준 합의
+  - 퍼스널 경로· Unicode 검사 등 팀 정책에 맞게 on/off
+
+Phase 4 — 패키지 분리 (지속)
+  - “엔터프라이즈 확장 스킬 팩”, “Codex 동기화 레이어” 등은 npm workspace 또는
+    별 repo로 분리해 메인 패키지 용량·인지부하 감소
+
+
+────────────────────────────────────────────────────────────────────────────────
+5. 성공 기준(측정 가능하게)
+────────────────────────────────────────────────────────────────────────────────
+
+  - 루트 기준 **추적 파일 수**(git ls-files) 또는 압축 tarball 크기: ECC 대비
+    예) 50~70% 감소 — 목표치는 팀이 설정
+  - `npm test` 전체 시간: 예) 2분 이내
+  - 신규 기여자 온보딩: “어느 폴더가 단일 진실인지” 질문 없이 README만으로 이해
+  - 선택 설치: **한 프로파일 + 한 명령**으로 재현 가능 (`npx ... install --profile team-default`)
+
+
+────────────────────────────────────────────────────────────────────────────────
+6. 리스크와 완화
+────────────────────────────────────────────────────────────────────────────────
+
+  - **기능 드리프트**: 상류 ECC 업스트림과의 차이 관리 → CHANGELOG에 “포크 분기점”
+    명시, 필요 시 스크립트로 업스트림 diff 알림
+  - **훅 과소 축소**: 보안/품질 게이트가 사라져 팀 규율이 약화 → 최소한 secret scan,
+    format/check 등은 유지할지 합의
+  - **문서 외부화**: 검색 가능성 하락 → 인덱스 페이지 또는 내부 위키 링크 테이블 필수
+
+
+────────────────────────────────────────────────────────────────────────────────
+7. 요약 체크리스트 (실무용)
+────────────────────────────────────────────────────────────────────────────────
+
+  [ ] 타깃 하네스 1~2개로 한정했는가
+  [ ] manifests 기준 단일 프로파일로 설치 경로가 닫히는가
+  [ ] skills/를 canonical로 두고 중복 트리(.agents 등)를 제거·생성기화했는가
+  [ ] agents/commands 수를 “역할 통합”으로 줄였는가
+  [ ] rules는 common + 스택 1종만 유지하는가
+  [ ] hooks는 minimal 또는 팀 합의 프로파일만 남겼는가
+  [ ] ecc CLI는 실제 쓰는 서브커맨드만 남겼는가
+  [ ] CI는 필수 검증만 빠르게 돌아가는가
+  [ ] docs는 코어 레포 밖으로 빼거나 최소화했는가
+  [ ] ecc2·Python GUI·비필수 실험 코드는 분리했는가
+
+
+================================================================================
+문서 끝
+================================================================================
