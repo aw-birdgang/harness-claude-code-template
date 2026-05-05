@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Read-only: resolves manifests/install-profiles.json + install-modules.json
- * into a JSON plan (no file copy). ECC install-plan.js 축소판.
+ * into a JSON plan (no file copy). 참조용 full install-plan의 축소판.
  */
 const fs = require('fs');
 const path = require('path');

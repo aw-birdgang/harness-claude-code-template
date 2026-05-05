@@ -1,5 +1,5 @@
 /**
- * Shared path/root helpers for hooks/scripts (확장 시 ECC utils.js 패턴 정렬).
+ * Shared path/root helpers for hooks/scripts (확장 시 참조 하네스 utils 패턴에 맞출 수 있음).
  */
 const path = require('path');
 
